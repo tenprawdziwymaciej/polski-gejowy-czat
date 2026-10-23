@@ -1,0 +1,14 @@
+{
+  "name": "random-video-chat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A minimal random one-to-one video chat starter using WebRTC and Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}

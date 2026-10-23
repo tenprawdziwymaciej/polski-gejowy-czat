@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Losowy Czat</title>
+  <style>
+    :root { color-scheme: dark; --bg:#10131a; --panel:#191e29; --muted:#aab3c5; --accent:#7c5cff; --line:#2c3445; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,Segoe UI,sans-serif; background:radial-gradient(circle at top,#24203f 0,#10131a 50%); color:#f4f6fb; }
+    header { padding:22px 5vw; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); gap:16px; }
+    .brand { font-size:1.2rem; font-weight:800; letter-spacing:.2px; }
+    .brand span { color:#a994ff; }
+    .pill { color:#d5d9e5; background:#242a38; border:1px solid #363e51; padding:7px 11px; border-radius:999px; font-size:.8rem; }
+    main { width:min(1120px,92vw); margin:28px auto; display:grid; grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr); gap:18px; }
+    .panel { background:rgba(25,30,41,.94); border:1px solid var(--line); border-radius:18px; overflow:hidden; box-shadow:0 16px 50px #0002; }
+    .video-grid { padding:14px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .video-box { min-height:230px; aspect-ratio:4/3; background:#0b0e14; border:1px solid #30384a; border-radius:13px; position:relative; overflow:hidden; display:grid; place-items:center; }
+    video { width:100%; height:100%; object-fit:cover; }
+    .video-box video { position:absolute; inset:0; }
+    .video-label { position:absolute; left:10px; bottom:10px; z-index:2; font-size:.78rem; padding:5px 8px; border-radius:7px; background:#080a10b8; }
+    .placeholder { text-align:center; padding:18px; color:var(--muted); }
+    .placeholder .emoji { font-size:2.2rem; margin-bottom:8px; }
+    .controls { padding:0 14px 14px; display:flex; gap:10px; flex-wrap:wrap; }
+    button { cursor:pointer; border:0; border-radius:10px; padding:11px 15px; font-weight:750; color:white; background:#343b4d; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .primary { background:var(--accent); }
+    .danger { background:#a9344c; }
+    .status { padding:12px 16px; border-top:1px solid var(--line); color:#c6cddd; font-size:.9rem; min-height:46px; }
+    .chat { display:flex; flex-direction:column; min-height:100%; }
+    .chat-head { padding:17px 18px; border-bottom:1px solid var(--line); font-weight:800; }
+    .messages { padding:16px; flex:1; min-height:300px; max-height:430px; overflow:auto; display:flex; flex-direction:column; gap:10px; }
+    .msg { max-width:90%; padding:10px 12px; border-radius:12px; background:#2b3242; overflow-wrap:anywhere; white-space:pre-wrap; }
+    .msg.mine { align-self:flex-end; background:#5140a2; }
+    .system { align-self:center; text-align:center; color:var(--muted); font-size:.82rem; padding:8px; }
+    .chat-form { display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); }
+    input { min-width:0; flex:1; background:#0e121a; color:white; border:1px solid #394255; border-radius:10px; padding:12px; outline:none; }
+    input:focus { border-color:#9b87ff; }
+    .notice { width:min(1120px,92vw); margin:-8px auto 28px; color:#b8c0d0; font-size:.84rem; line-height:1.5; }
+    .notice strong { color:#f2d9a0; }
+    @media (max-width:800px) { main { grid-template-columns:1fr; } .video-box { min-height:170px; } .messages { min-height:220px; } header { padding:17px 4vw; } }
+    @media (max-width:480px) { .video-grid { grid-template-columns:1fr; } .video-box { min-height:220px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">◉ <span>Losowy</span> Czat</div>
+    <div class="pill">Wersja demonstracyjna</div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="video-grid">
+        <div class="video-box">
+          <video id="localVideo" autoplay muted playsinline hidden></video>
+          <div id="localPlaceholder" class="placeholder"><div class="emoji">📷</div><strong>Twoja kamera</strong><div>Włącz kamerę, aby rozpocząć</div></div>
+          <div class="video-label">Ty</div>
+        </div>
+        <div class="video-box">
+          <video id="remoteVideo" autoplay playsinline hidden></video>
+          <div id="remotePlaceholder" class="placeholder"><div class="emoji">👤</div><strong>Losowy rozmówca</strong><div>Jeszcze nie połączono</div></div>
+          <div class="video-label">Rozmówca</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="primary" id="startBtn">Włącz kamerę i szukaj</button>
+        <button id="nextBtn" disabled>Następna osoba</button>
+        <button id="cameraBtn" disabled>Wyłącz kamerę</button>
+        <button class="danger" id="reportBtn" disabled>Zgłoś</button>
+      </div>
+      <div class="status" id="status" role="status">Kliknij „Włącz kamerę i szukaj”, aby rozpocząć.</div>
+    </section>
+
+    <section class="panel chat">
+      <div class="chat-head">💬 Czat tekstowy</div>
+      <div class="messages" id="messages" aria-live="polite">
+        <div class="system">Wiadomości pojawią się tutaj po połączeniu.</div>
+      </div>
+      <form class="chat-form" id="chatForm">
+        <input id="messageInput" maxlength="1000" placeholder="Napisz wiadomość…" autocomplete="off" disabled>
+        <button class="primary" id="sendBtn" disabled>Wyślij</button>
+      </form>
+    </section>
+  </main>
+
+  <div class="notice">
+    <strong>Bezpieczeństwo:</strong> nie podawaj danych osobowych ani lokalizacji. Rozmawiaj tylko z osobami, z którymi czujesz się bezpiecznie; możesz zakończyć rozmowę w każdej chwili.
+    To projekt startowy, a przycisk „Zgłoś” jest tylko demonstracją — przed udostępnieniem publicznym potrzebujesz prawdziwej moderacji, ochrony przed nadużyciami i zasad korzystania.
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const $ = (id) => document.getElementById(id);
+    const localVideo = $("localVideo");
+    const remoteVideo = $("remoteVideo");
+    const localPlaceholder = $("localPlaceholder");
+    const remotePlaceholder = $("remotePlaceholder");
+    const statusEl = $("status");
+    const messages = $("messages");
+    const messageInput = $("messageInput");
+    const sendBtn = $("sendBtn");
+    const startBtn = $("startBtn");
+    const nextBtn = $("nextBtn");
+    const cameraBtn = $("cameraBtn");
+    const reportBtn = $("reportBtn");
+
+    let localStream = null;
+    let peer = null;
+    let matched = false;
+    let cameraEnabled = true;
+
+    // Public STUN servers help peers discover direct connection paths.
+    // A production service should configure its own TURN provider too.
+    const rtcConfig = {
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    };
+
+    function setStatus(text) { statusEl.textContent = text; }
+
+    function addMessage(text, mine = false, system = false) {
+      const el = document.createElement("div");
+      el.className = system ? "system" : "msg" + (mine ? " mine" : "");
+      el.textContent = text;
+      messages.appendChild(el);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function setChatEnabled(enabled) {
+      messageInput.disabled = !enabled;
+      sendBtn.disabled = !enabled;
+      reportBtn.disabled = !enabled;
+    }
+
+    function closePeer() {
+      if (peer) {
+        peer.ontrack = null;
+        peer.onicecandidate = null;
+        peer.close();
+        peer = null;
+      }
+      remoteVideo.srcObject = null;
+      remoteVideo.hidden = true;
+      remotePlaceholder.hidden = false;
+      matched = false;
+      setChatEnabled(false);
+    }
+
+    function createPeer() {
+      peer = new RTCPeerConnection(rtcConfig);
+      if (localStream) {
+        localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+      }
+      peer.ontrack = (event) => {
+        remoteVideo.srcObject = event.streams[0];
+        remoteVideo.hidden = false;
+        remotePlaceholder.hidden = true;
+      };
+      peer.onicecandidate = (event) => {
+        if (event.candidate) socket.emit("signal", { type: "ice-candidate", candidate: event.candidate });
+      };
+      peer.onconnectionstatechange = () => {
+        if (peer && ["failed", "disconnected", "closed"].includes(peer.connectionState)) {
+          setStatus("Połączenie zostało przerwane. Kliknij „Następna osoba”.");
+        }
+      };
+    }
+
+    async function startCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Ta przeglądarka nie obsługuje kamery. Użyj HTTPS lub localhost.");
+      }
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
+      localVideo.hidden = false;
+      localPlaceholder.hidden = true;
+      cameraEnabled = true;
+      cameraBtn.textContent = "Wyłącz kamerę";
+      cameraBtn.disabled = false;
+    }
+
+    startBtn.addEventListener("click", async () => {
+      startBtn.disabled = true;
+      try {
+        if (!localStream) await startCamera();
+        setStatus("Szukam rozmówcy…");
+        socket.emit("find-partner");
+        nextBtn.disabled = false;
+      } catch (error) {
+        setStatus(error.message || "Nie udało się uruchomić kamery.");
+        startBtn.disabled = false;
+      }
+    });
+
+    nextBtn.addEventListener("click", () => {
+      closePeer();
+      messages.innerHTML = "";
+      addMessage("Szukam kolejnej osoby…", false, true);
+      setStatus("Szukam kolejnej osoby…");
+      setChatEnabled(false);
+      socket.emit("next-partner");
+    });
+
+    cameraBtn.addEventListener("click", () => {
+      if (!localStream) return;
+      cameraEnabled = !cameraEnabled;
+      localStream.getVideoTracks().forEach(track => track.enabled = cameraEnabled);
+      cameraBtn.textContent = cameraEnabled ? "Wyłącz kamerę" : "Włącz kamerę";
+    });
+
+    $("chatForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = messageInput.value.trim();
+      if (!text || !matched) return;
+      socket.emit("chat-message", text);
+      addMessage(text, true);
+      messageInput.value = "";
+    });
+
+    reportBtn.addEventListener("click", () => {
+      socket.emit("report-partner");
+      addMessage("Zgłoszenie wysłane w trybie demonstracyjnym.", false, true);
+    });
+
+    socket.on("waiting", () => {
+      matched = false;
+      setStatus("Czekam na wolnego rozmówcę…");
+    });
+
+    socket.on("matched", async ({ initiator }) => {
+      closePeer();
+      createPeer();
+      matched = true;
+      setChatEnabled(true);
+      addMessage("Połączono z rozmówcą. Zachowuj ostrożność i nie udostępniaj danych osobowych.", false, true);
+      setStatus("Połączono! Miłej rozmowy.");
+      if (initiator) {
+        try {
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+          socket.emit("signal", { type: "offer", sdp: peer.localDescription });
+        } catch (error) {
+          setStatus("Nie udało się rozpocząć połączenia wideo.");
+        }
+      }
+    });
+
+    socket.on("signal", async (payload) => {
+      if (!peer) return;
+      try {
+        if (payload.type === "offer") {
+          await peer.setRemoteDescription(payload.sdp);
+          const answer = await peer.createAnswer();
+          await peer.setLocalDescription(answer);
+          socket.emit("signal", { type: "answer", sdp: peer.localDescription });
+        } else if (payload.type === "answer") {
+          await peer.setRemoteDescription(payload.sdp);
+        } else if (payload.type === "ice-candidate" && payload.candidate) {
+          await peer.addIceCandidate(payload.candidate);
+        }
+      } catch (error) {
+        setStatus("Błąd połączenia. Spróbuj przejść do następnej osoby.");
+      }
+    });
+
+    socket.on("chat-message", (text) => addMessage(text));
+    socket.on("partner-left", () => {
+      closePeer();
+      addMessage("Rozmówca opuścił czat.", false, true);
+      setStatus("Rozmówca rozłączył się. Kliknij „Następna osoba”, aby szukać dalej.");
+    });
+    socket.on("report-received", () => setStatus("Zgłoszenie odnotowane w konsoli serwera (tryb demonstracyjny)."));
+
+    window.addEventListener("beforeunload", () => {
+      if (localStream) localStream.getTracks().forEach(track => track.stop());
+      if (peer) peer.close();
+    });
+  </script>
+</body>
+</html>
