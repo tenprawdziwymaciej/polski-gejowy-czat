@@ -112,9 +112,31 @@
 
     // Public STUN servers help peers discover direct connection paths.
     // A production service should configure its own TURN provider too.
-    const rtcConfig = {
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-    };
+    const iceServers = [
+  {
+    urls: "stun:stun.relay.metered.ca:80",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80",
+    username: "e46f2b9076070b98559cd2bd",
+    credential: "ea7Dqiun5gExlSij",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+    username: "e46f2b9076070b98559cd2bd",
+    credential: "ea7Dqiun5gExlSij",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443",
+    username: "e46f2b9076070b98559cd2bd",
+    credential: "ea7Dqiun5gExlSij",
+  },
+  {
+    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+    username: "e46f2b9076070b98559cd2bd",
+    credential: "ea7Dqiun5gExlSij",
+  },
+];
 
     function setStatus(text) { statusEl.textContent = text; }
 
